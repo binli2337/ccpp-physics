@@ -364,7 +364,8 @@
               windrel=sqrt((u1(i)-usfco(i))**2+(v1(i)-vsfco(i))**2) 
             endif
 
-            if (sfc_z0_type == -1) then    ! using wave model derived momentum roughness
+!            if (sfc_z0_type == -1) then    ! using wave model derived momentum roughness
+             if( sfc_z0_type.eq.-1 .or. (sfc_z0_type.le.-6 .and. z0rl_wav(i).ge.0.0 ) ) then
               tem1 = 0.11 * vis / ustar_wat(i)
               z0 = tem1 +  0.01_kp * z0rl_wav(i)
 
@@ -404,6 +405,12 @@
               errflg = 1
               errmsg = 'ERROR(sfc_diff_run): no option for sfc_z0_type'
               return
+            endif
+! For HAFS, outside wave model domain
+            if ( sfc_z0_type == -6 .and. z0rl_wav(i) < 0.0 ) then
+              call znot_t_v6(wind10m, ztmax_wat(i))   ! 10-m wind,m/s, ztmax(m)
+            else if ( sfc_z0_type == -7 .and. z0rl_wav(i) < 0.0 ) then
+              call znot_t_v7(wind10m, ztmax_wat(i))   ! 10-m wind,m/s, ztmax(m)
             endif
 !
             call stability
@@ -461,6 +468,32 @@
              endif
 
             endif
+! 2-way atmosphere-wave coupling case:
+! 1) For grid points over WW3 model domain,
+! compute z0rl_wat using zo from WW3
+            if (sfc_z0_type <= -6 .and. z0rl_wav(i) > 0.0) then   ! using wave model
+!                                                                 derived momentum roughness
+              tem1 = 0.11 * vis / ustar_wat(i)
+              z0 = tem1 +  0.01_kp * z0rl_wav(i)
+
+              if (redrag) then
+                z0max = max(min(z0, z0s_max),1.0e-7_kp)
+              else
+                z0max = max(min(z0,0.1_kp), 1.0e-7_kp)
+              endif
+              z0rl_wat(i) = 100.0_kp * z0max   ! cm
+            endif
+   
+! 2) For grid points outside WW3 model domain, but still within the
+!  ocean domain of FV3, compute z0rl_wat using sfc_z0_type=6 or 7
+              if (sfc_z0_type == -6 .and. z0rl_wav(i) < 0.0) then      ! wang
+                 call znot_m_v6(wind10m, z0)   ! wind, m/s, z0, m
+                 z0rl_wat(i) = 100.0_kp * z0   ! cm
+              elseif (sfc_z0_type == -7 .and. z0rl_wav(i) < 0.0) then   ! wang
+                 call znot_m_v7(wind10m, z0)   ! wind, m/s, z0, m
+                 z0rl_wat(i) = 100.0_kp * z0   ! cm
+              endif
+!
 
           endif              ! end of if(open ocean)
 !

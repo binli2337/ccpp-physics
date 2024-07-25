@@ -461,6 +461,32 @@
              endif
 
             endif
+! 2-way atmosphere-wave coupling case:
+! 1) For grid points over WW3 model domain,
+! compute z0rl_wat using zo from WW3
+            if (sfc_z0_type <= -6 .and. z0rl_wav(i) > 0.0) then   ! using wave model
+!                                                                 derived momentum roughness
+              tem1 = 0.11 * vis / ustar_wat(i)
+              z0 = tem1 +  0.01_kp * z0rl_wav(i)
+
+              if (redrag) then
+                z0max = max(min(z0, z0s_max),1.0e-7_kp)
+              else
+                z0max = max(min(z0,0.1_kp), 1.0e-7_kp)
+              endif
+              z0rl_wat(i) = 100.0_kp * z0max   ! cm
+            endif
+   
+! 2) For grid points outside WW3 model domain, but still within the
+!  ocean domain of FV3, compute z0rl_wat using sfc_z0_type=6 or 7
+              if (sfc_z0_type == -6 .and. z0rl_wav(i) < 0.0) then      ! wang
+                 call znot_m_v6(wind10m, z0)   ! wind, m/s, z0, m
+                 z0rl_wat(i) = 100.0_kp * z0   ! cm
+              elseif (sfc_z0_type == -7 .and. z0rl_wav(i) < 0.0) then   ! wang
+                 call znot_m_v7(wind10m, z0)   ! wind, m/s, z0, m
+                 z0rl_wat(i) = 100.0_kp * z0   ! cm
+              endif
+!
 
           endif              ! end of if(open ocean)
 !
